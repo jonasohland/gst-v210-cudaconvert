@@ -1,0 +1,29 @@
+[package]
+name = "gst-cudav210"
+version = "0.1.0"
+edition = "2021"
+description = "CUDA accelerated conversion to and from v210"
+license = "MPL-2.0"
+repository = "https://example.invalid/gst-cudav210"
+rust-version = "1.83"
+
+[lib]
+name = "gstcudav210"
+crate-type = ["cdylib", "rlib"]
+path = "src/lib.rs"
+
+[dependencies]
+gst = { package = "gstreamer", version = "0.25" }
+gst-base = { package = "gstreamer-base", version = "0.25" }
+gst-video = { package = "gstreamer-video", version = "0.25" }
+
+[dev-dependencies]
+gst-app = { package = "gstreamer-app", version = "0.25" }
+gst-check = { package = "gstreamer-check", version = "0.25" }
+
+[build-dependencies]
+gst-plugin-version-helper = "0.8"
+pkg-config = "0.3"
+
+[profile.release]
+lto = "thin"
