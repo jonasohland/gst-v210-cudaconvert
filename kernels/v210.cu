@@ -12,15 +12,9 @@
 
 #include <stdint.h>
 
-// Must match `KernelParams` in src/cuda/mod.rs.
-struct Params {
-  unsigned long long plane[3];  // device pointers of the non-v210 frame
-  long long stride[3];          // their strides in bytes
-  unsigned long long v210;      // device pointer of the v210 frame
-  long long v210_stride;        // its stride in bytes
-  int width;
-  int height;
-};
+#include "v210-params.h"
+
+using Params = V210Params;
 
 struct Group {
   uint32_t y[6];
@@ -251,7 +245,7 @@ __device__ void unpack420(const Params &p) {
 }
 
 // ---------------------------------------------------------------------------
-// Entry points, looked up by name from Rust (src/format.rs).
+// Entry points, looked up by name from the host code (src/gstcudav210convert.c).
 
 #define ENTRY(name, body) \
   extern "C" __global__ void __launch_bounds__(256) name(Params p) { body(p); }

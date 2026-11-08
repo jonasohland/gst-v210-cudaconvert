@@ -15,16 +15,21 @@ GStreamer elements that convert to and from **v210** on NVIDIA GPUs.
 ## Build
 
 ```sh
-nix develop            # CUDA 13.x toolkit
-nix develop .#cuda12   # CUDA 12.9 toolkit (target dir: target/cuda12)
-cargo build            # plugin ends up on GST_PLUGIN_PATH set by the shell
-cargo test             # needs an NVIDIA GPU
+nix develop                  # CUDA 13.x toolkit
+meson setup build            # plugin ends up on GST_PLUGIN_PATH set by the shell
+ninja -C build
+meson test -C build          # needs an NVIDIA GPU
 
-nix build              # CUDA 13 -> result/lib/gstreamer-1.0/libgstcudav210.so
-nix build .#cuda12     # CUDA 12.9
+nix develop .#cuda12         # CUDA 12.9 toolkit, build dir: build-cuda12
+meson setup build-cuda12 && ninja -C build-cuda12
+
+nix build                    # CUDA 13 -> result/lib/gstreamer-1.0/libgstcudav210.so
+nix build .#cuda12           # CUDA 12.9
 ```
 
-Kernels are compiled for sm_75/80/86/89/90/120, plus PTX for sm_120. Override this with `CUDA_ARCHS="86;120"`. The plugin doesn't link libcuda: gst-cuda loads the driver at runtime. A CUDA 12.9 build runs on 12.9+ drivers, and a CUDA 13 build needs a 13.x driver.
+Outside Nix you need gst-plugins-bad (gst-cuda), the CUDA toolkit (`nvcc`, `cuda.h`) and OpenGL headers, which gst-cuda's headers include.
+
+Kernels are compiled for sm_75/80/86/89/90/120, plus PTX for sm_120. Override this with `-Dgpu_archs=86,120`, and pick a different compiler with `-Dnvcc=/path/to/nvcc`. The plugin doesn't link libcuda: gst-cuda loads the driver at runtime and the plugin calls the driver through it. A CUDA 12.9 build runs on 12.9+ drivers, and a CUDA 13 build needs a 13.x driver.
 
 On non-NixOS hosts the dev shell symlinks the host's NVIDIA driver libraries into `.driver-libs/` and adds that to `LD_LIBRARY_PATH`. It also uses a private GStreamer registry, `.gst-registry.bin`.
 

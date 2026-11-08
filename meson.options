@@ -1,0 +1,7 @@
+option('nvcc', type: 'string', value: 'nvcc',
+  description: 'CUDA compiler used to build the kernels')
+option('gpu_archs', type: 'array',
+  value: ['75', '80', '86', '89', '90', '120'],
+  description: 'GPU architectures to build SASS for (PTX is added for the newest)')
+option('tests', type: 'feature', value: 'auto',
+  description: 'Build the tests (running them needs an NVIDIA GPU)')

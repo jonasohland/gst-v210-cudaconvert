@@ -23,6 +23,16 @@
           gst.gstreamer
           gst.gst-plugins-base
           gst.gst-plugins-bad
+          # gst-cuda's headers include <GL/gl.h>, and its pkg-config file
+          # requires glesv2/opengl.
+          pkgs.libGL
+        ];
+
+        buildTools = [
+          pkgs.meson
+          pkgs.ninja
+          pkgs.pkg-config
+          pkgs.python3
         ];
 
         cudaDeps = cudaPkgs: [
@@ -34,52 +44,38 @@
         # Build the plugin against one CUDA toolkit.
         mkPlugin =
           cudaPkgs:
-          pkgs.rustPlatform.buildRustPackage.override { stdenv = cudaPkgs.backendStdenv; } {
+          cudaPkgs.backendStdenv.mkDerivation {
             pname = "gst-cudav210";
             version = "0.1.0";
             src = pkgs.lib.cleanSource ./.;
-            cargoLock.lockFile = ./Cargo.lock;
-            nativeBuildInputs = [
-              pkgs.pkg-config
-              cudaPkgs.cuda_nvcc
-            ];
-            # Headers for nvcc (cuda_runtime.h etc.) must be buildInputs.
+            nativeBuildInputs = buildTools ++ [ cudaPkgs.cuda_nvcc ];
+            # Headers for nvcc and gst-cuda (cuda.h etc.) must be buildInputs.
             buildInputs = gstDeps ++ [
               cudaPkgs.cuda_cudart
               cudaPkgs.cccl
             ];
             # Tests need a GPU; run them from the dev shell instead.
-            doCheck = false;
-            postInstall = ''
-              mkdir -p $out/lib/gstreamer-1.0
-              mv $out/lib/libgstcudav210.so $out/lib/gstreamer-1.0/
-              rm -f $out/lib/libgstcudav210.rlib
-            '';
+            mesonFlags = [ "-Dtests=disabled" ];
           };
 
-        # Each CUDA version gets its own cargo target dir: build.rs can't see
-        # which nvcc is on PATH, so a shared one would mix up fatbins.
+        # Each CUDA version gets its own meson build dir, since meson records
+        # the nvcc it found at setup time.
         mkShell =
-          targetDir: cudaPkgs:
+          buildDir: cudaPkgs:
           (pkgs.mkShell.override { stdenv = cudaPkgs.backendStdenv; }) {
             packages =
               with pkgs;
               [
-                rustc
-                cargo
-                clippy
-                rustfmt
-                rust-analyzer
-                pkg-config
+                clang-tools
                 gst.gst-plugins-good
               ]
+              ++ buildTools
               ++ gstDeps
               ++ cudaDeps cudaPkgs;
             shellHook = ''
               # Don't let a host CUDA install (e.g. /opt/cuda on Arch) leak in.
               unset NVCC_CCBIN CUDA_PATH CUDA_HOME
-              export CARGO_TARGET_DIR="$PWD/${targetDir}"
-              export GST_PLUGIN_PATH="$CARGO_TARGET_DIR/debug"
+              export GST_PLUGIN_PATH="$PWD/${buildDir}"
               # Separate registry so the host's GStreamer cache doesn't interfere.
               export GST_REGISTRY="$PWD/.gst-registry.bin"
 
@@ -100,9 +96,9 @@
           cuda12 = mkPlugin pkgs.cudaPackages_12_9;
         };
         devShells = {
-          default = mkShell "target" pkgs.cudaPackages_13;
-          cuda13 = mkShell "target" pkgs.cudaPackages_13;
-          cuda12 = mkShell "target/cuda12" pkgs.cudaPackages_12_9;
+          default = mkShell "build" pkgs.cudaPackages_13;
+          cuda13 = mkShell "build" pkgs.cudaPackages_13;
+          cuda12 = mkShell "build-cuda12" pkgs.cudaPackages_12_9;
         };
       }
     );
